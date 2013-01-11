@@ -1,0 +1,325 @@
+/*********************************************
+ isDecoded Maker v1.1  
+    The main function of this pde is to create a web
+    based on any ID that is put into the setMainPlot
+    function. It will return a set of ArrayLists that
+    contain both the plots and sets of lines connecting
+    them.
+    
+    Key functions: 
+      1. setMainPlot(Entry id, var parentX, var parentY, var radius): calculates
+           all of the plots/lines based on the connections array 
+      2. displayLines(): displays lines based on the lines array
+      3. displayPlots(): displays plots based on plots array 
+      
+    Navigation:
+      1. Mouse Keys: use UP/DOWN/LEFT/RIGHT to move the view
+      2. Zoom: use the mouseScroll to zoom in or out
+      3. Drag: drag the view with the mouse
+/*********************************************/
+
+
+/*Section 1: Initialization*******************/
+
+/*@pjs preload = 'butterfly.jpg'; */ 
+PImage img; 
+Entry kanye; 
+int defaultRadius = 200; 
+ArrayList plots; 
+ArrayList lines; 
+
+//User Movement Controls
+var offsetX; 
+var offsetY; 
+var relX; 
+var relY; 
+float scaleFactor; 
+
+void setup(){ 
+  //initialize params
+  size(1000,750); 
+  img = loadImage("butterfly.jpg"); 
+  kanye = new Entry("kanye", null, img); 
+  scaleFactor = 1; 
+  relX = 0; 
+  relY = 0; 
+  
+  /*Kanye Initialization: ********************************
+    This creates a set of connections for kanye for the 
+    image to fill in. This would be determined by the server  
+  */
+  
+  //give kanye some children connections
+  var numChilds = random(1,10); 
+  for(int i = 0; i < numChilds; i++){ 
+     var child = new Entry(i, null, img); 
+    
+     //give kanye granchildren
+     var numGrandchildren = random(1,8); 
+     for(int j = 0; j < numGrandchildren; j++){ 
+       var grandChild = new Entry(j, null, img); 
+       child.connections.add(grandChild); 
+     }
+     kanye.connections.add(child); 
+  } 
+  
+  /*Main Plot: *****************************************
+  assigns the plots array and lines array based on connections*/  
+  setMainPlot(kanye, width/2, height/2, defaultRadius);
+} 
+
+void draw(){ 
+  background(255);  
+  
+  /*Display: these functions display*/
+  translate(relX, relY); 
+  displayLines(); 
+  displayPlots(); 
+}
+
+/***************************************************************************/
+class Plot{
+  var ID; 
+  var posX; 
+  var posY; 
+
+  Plot(var ID, var posX, var posY){ 
+    this.ID = ID; 
+    this.posX = posX; 
+    this.posY = posY; 
+    this.img = img; 
+  }    
+  
+  //display the plot and scales it
+  void display(var scaleFactor){
+    ellipse(this.posX*scaleFactor, this.posY*scaleFactor, 55*scaleFactor,55*scaleFactor); 
+    image(this.img, (this.posX - 20)*scaleFactor, (this.posY - 20)*scaleFactor, 40*scaleFactor,40*scaleFactor);   
+  }
+}
+/***************************************************************************/
+class Entry{
+  var ID; 
+  ArrayList connections; 
+  PImage img; 
+  boolean origin; 
+  String info; 
+  ArrayList videos; 
+  
+  Entry(var ID, ArrayList connections, PImage img){
+    this.ID = ID; 
+    if(connections!= null){
+      this.connections = connections;   
+    }else{
+      this.connections = new ArrayList();   
+    }
+    this.img = img;     
+    this.origin = true; //this should be retrieved from the server based on ID 
+    this.info = ""; //this should be retrieved from the server based on ID 
+    this.videos = new ArrayList();  //this should be retrieved from the server based on ID
+  }
+}
+/***************************************************************************/
+//class Line holds the coordinates for a line and displays them
+class Line{
+  var parentX; 
+  var parentY; 
+  var childX; 
+  var childY; 
+  
+  Line(var parentX, var parentY, var childX, var childY){
+    this.parentX = parentX; 
+    this.parentY = parentY; 
+    this.childX = childX; 
+    this.childY = childY; 
+  } 
+  
+  //displays a line and scales it 
+  void display(var scaleFactor){ 
+    line(parentX*scaleFactor, parentY*scaleFactor, childX*scaleFactor, childY*scaleFactor); 
+  } 
+} 
+
+/***************************************************************************/ 
+//setMainPlot: Assigns the main plot, if possible, and sets the child plot locations 
+
+function setMainPlot(Entry id, var parentX, var parentY, var radius){ 
+    //reinitialize plots and lines ArrayLists 
+    plots = new ArrayList(); 
+    lines = new ArrayList(); 
+    
+    //create Main plot
+    var parentPlot = createPlot(id, parentX, parentY); 
+    plots.add(parentPlot); 
+    
+    //create children plots
+    var size = id.connections.size(); 
+    var count = 0; 
+    for(int i = 0; i < size; i++){ 
+      //evenly space out the plots around the main plot 
+      var childRadius = count%2 == 0 ? radius : radius*2; 
+      var theta = size%2 == 1 ? i*(315/size) : i*(360/size); 
+      var childEntry = id.connections.get(i); 
+      var childX = childRadius*cos(radians(theta)) + parentX; 
+      var childY =  childRadius*sin(radians(theta)) + parentY; 
+      
+      /*PLOT: take child plot and place it within the plots array*/ 
+      var childPlot = createPlot(childEntry.ID, childX, childY); 
+      plots.add(childPlot); 
+      
+      /*LINE: take child line and put it into the line array*/ 
+      //minX/Y are the minimum distance to create a sigment from the parent plot.
+      var minX = (childRadius/2)*cos(radians(theta)); 
+      var minY = (childRadius/2)*sin(radians(theta)); 
+      //This breaks up the lines into two segments
+      var segmentX = parentX < childX ? random(parentX + minX,childX) : random(childX, parentX + minX); 
+      var segmentY = parentY < childY ? random(parentY + minY,childY) : random(childY, parentY + minY); 
+      //add lines to array
+      var childLine1 = new Line(parentX, parentY, segmentX, segmentY); 
+      var childLine2 = new Line(segmentX, segmentY, childX, childY); 
+      lines.add(childLine1); 
+      lines.add(childLine2);
+      count++;  
+      
+      
+      //if the child node has connections, add them 
+      if(childEntry.connections != null && radius > 0){ 
+        childEntry.connections.size() > 4 ? sidePlot(childEntry, childX, childY, radius/2) : sidePlotSemiCircle(childEntry, childX, childY, radius/2, theta); 
+      };   
+    }  
+}
+
+//sidePlot: arranges the children plots differently from the main plot
+function sidePlot(Entry id, var parentX, var parentY, var radius){
+  var size = id.connections.size(); 
+  for(int i = 0; i < size; i++){ 
+    
+      //evenly space out the plots around the parent plot       
+      var theta = i*(360/size) + (360/size + 1); 
+      var childEntry = id.connections.get(i); 
+      var childX = radius*cos(radians(theta)) + parentX; 
+      var childY =  radius*sin(radians(theta)) + parentY; 
+      
+      //create a child plot and place it within the plots array
+      var childPlot = createPlot(childEntry.ID, childX, childY); //create plot for all his connections 
+      plots.add(childPlot); 
+        
+      /*LINE: take child line and put it into the line array*/ 
+      //minX/Y are the minimum distance to create a sigment from the parent plot.
+      var minX = (radius/5)*cos(radians(theta)); 
+      var minY = (radius/5)*sin(radians(theta)); 
+      //This breaks up the lines into two segments
+      var segmentX = parentX < childX ? random(parentX + minX,childX) : random(childX, parentX + minX); 
+      var segmentY = parentY < childY ? random(parentY + minY,childY) : random(childY, parentY + minY); 
+      //add lines to array
+      var childLine1 = new Line(parentX, parentY, segmentX, segmentY); 
+      var childLine2 = new Line(segmentX, segmentY, childX, childY); 
+      lines.add(childLine1); 
+      lines.add(childLine2); 
+      
+      //if the child node has connections, add them
+      if(childEntry.connections != null && radius > 0){
+        childEntry.connections.size() > 4 ? sidePlot(childEntry, childX, childY, radius/2) : sidePlotSemiCircle(childEntry, childX, childY, radius/2, theta);
+      }; 
+  }
+} 
+
+//sidePlotSemiCircle: arranges the children plots in a semi circle from the main plot
+function sidePlotSemiCircle(Entry id, var parentX, var parentY, var radius, var theta){ 
+  var size = id.connections.size(); 
+  for(int i = 0; i < size; i++){ 
+    
+      //evenly space out the plots around the parent plot 
+      var theta2 = size == 1 ? theta : theta - 45 + i*(180/size - 1); 
+      var childEntry = id.connections.get(i); 
+      var childX = radius*cos(radians(theta2)) + parentX; 
+      var childY =  radius*sin(radians(theta2)) + parentY; 
+      
+      //create a child plot and place it within the plots array
+      var childPlot = createPlot(childEntry.ID, childX, childY); //create plot for all his connections 
+      plots.add(childPlot); 
+        
+      /*LINE: take child line and put it into the line array*/ 
+      //minX/Y are the minimum distance to create a sigment from the parent plot.
+      var minX = (radius/5)*cos(radians(theta2)); 
+      var minY = (radius/5)*sin(radians(theta2)); 
+      //This breaks up the lines into two segments
+      var segmentX = parentX < childX ? random(parentX + minX,childX) : random(childX, parentX + minX); 
+      var segmentY = parentY < childY ? random(parentY + minY,childY) : random(childY, parentY + minY); 
+      //add lines to array
+      var childLine1 = new Line(parentX, parentY, segmentX, segmentY); 
+      var childLine2 = new Line(segmentX, segmentY, childX, childY); 
+      lines.add(childLine1); 
+      lines.add(childLine2); 
+      
+      //if the child node has connections, add them
+      if(childEntry.connections != null && radius > 0){
+        childEntry.connections.size() > 4 ? sidePlot(childEntry, childX, childY, radius/2) : sidePlotSemiCircle(childEntry, childX, childY, radius/2, theta2);
+      }; 
+  }
+} 
+
+function createPlot(var id, var posX, var posY){ 
+  //create a plot for that ID 
+  Plot plot = new Plot(id, posX, posY); 
+  return plot; 
+} 
+
+/***************************************************************************/
+
+//display each line in the lines ArrayList 
+void displayLines(){ 
+  for(int i = 0; i < lines.size(); i++){ 
+    lines.get(i).display(scaleFactor); 
+  } 
+} 
+
+//displays each plot in the plots ArrayList
+void displayPlots(){  
+  for(int i = 0; i < plots.size(); i++){
+    plots.get(i).display(scaleFactor);   
+  }
+} 
+
+void mouseDragged(){
+  //move the view relative to the mouse
+  relX = offsetX + mouseX; 
+  relY = offsetY + mouseY;   
+}
+
+void mousePressed(){
+  //Check the distance of the mouseClick from relX
+  offsetX = relX - mouseX; 
+  offsetY = relY - mouseY; 
+}
+
+void keyPressed(){
+  //check to see if the key is UP/DOWN/LEFT/RIGHT and move the view accordingly
+  if(key == CODED){
+    if(keyCode == UP){
+      relY += 50*scaleFactor; 
+    }else if(keyCode == DOWN){ 
+      relY -= 50*scaleFactor; 
+    }else if(keyCode == LEFT){ 
+      relX += 50*scaleFactor;  
+    }else if(keyCode == RIGHT){
+      relX -= 50*scaleFactor; 
+    }
+  } 
+}
+
+void mouseScrolled(){
+  //if the mouse is scrolled then zoom in or out
+  if(mouseScroll){
+    mouseScroll > 0 ? scaleFactor += .25 : scaleFactor -= .25; 
+    
+    //only give 10 points of zoom
+    if(scaleFactor > 2.5){
+      scaleFactor = 2.5;   
+    }else if(scaleFactor < .25){
+      scaleFactor = .25;   
+    }
+  }else{
+    //some mice never change mouseScroll back to zero and constantly scroll. This fixes that.  
+    mouseScroll = 0;   
+  }
+}
